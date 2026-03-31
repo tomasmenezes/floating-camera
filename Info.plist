@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Info.plist — Floating Camera
+     Copyright (c) 2026 Tomás Menezes @tomasmenezes — MIT License -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>     <string>FloatingCamera</string>
+    <key>CFBundleIdentifier</key>     <string>com.tomasmenezes.floatingcamera</string>
+    <key>CFBundleName</key>           <string>Floating Camera</string>
+    <key>CFBundleDisplayName</key>    <string>Floating Camera</string>
+    <key>CFBundleVersion</key>        <string>1.0</string>
+    <key>CFBundleShortVersionString</key> <string>1.0</string>
+    <key>CFBundlePackageType</key>    <string>APPL</string>
+    <key>CFBundleSignature</key>      <string>FCAM</string>
+    <key>CFBundleIconFile</key>       <string>AppIcon</string>
+    <key>CFBundleIconName</key>       <string>AppIcon</string>
+    <key>NSPrincipalClass</key>       <string>NSApplication</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Floating Camera needs camera access to display the live preview overlay.</string>
+    <key>LSUIElement</key>            <true/>
+    <key>LSMinimumSystemVersion</key> <string>12.0</string>
+    <key>LSApplicationCategoryType</key> <string>public.app-category.utilities</string>
+    <key>NSHighResolutionCapable</key>   <true/>
+    <key>NSSupportsAutomaticTermination</key> <false/>
+    <key>NSSupportsSuddenTermination</key>    <false/>
+    <key>NSRequiresAquaSystemAppearance</key> <false/>
+</dict>
+</plist>
