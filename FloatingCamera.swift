@@ -615,8 +615,12 @@ final class CameraCaptureManager {
             do {
                 let input = try AVCaptureDeviceInput(device: dev)
                 session.beginConfiguration()
-                session.inputs.forEach { session.removeInput($0) }
+                // Removal must precede canAddInput() — a session won't take two video
+                // inputs — so keep the old inputs and restore them if the new one fails.
+                let previousInputs = session.inputs
+                previousInputs.forEach { session.removeInput($0) }
                 guard session.canAddInput(input) else {
+                    previousInputs.forEach { if session.canAddInput($0) { session.addInput($0) } }
                     session.commitConfiguration()
                     completion(.failure(CameraCaptureError.cannotAddInput)); return
                 }
