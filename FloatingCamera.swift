@@ -1288,6 +1288,9 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
     }
     func windowDidEndLiveResize(_ n: Notification) {
         isDragging = false
+        // Restore only once the drag is over — windowDidResize fires continuously
+        // throughout it, so restoring there would undo the elevation immediately.
+        window?.level = .floating
         persistFrame(); syncHoverOverlay(); onStateChanged?()
     }
     func windowWillResize(_ sender: NSWindow, to newSize: NSSize) -> NSSize {
@@ -1301,7 +1304,9 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
     func windowDidResize(_ n: Notification) {
         // Re-clamp the corner radius: "Full" tracks the new size.
         applyCornerRadius()
-        window?.level = .floating   // restore normal level after resize
+        // Programmatic setFrame also routes through windowWillResize with no
+        // end-live-resize to follow, so restore the level for that case here.
+        if !(window?.inLiveResize ?? false) { window?.level = .floating }
         persistFrame(); syncHoverOverlay(); onStateChanged?()
     }
     func windowDidBecomeKey(_ n: Notification) { isDragging = false }
