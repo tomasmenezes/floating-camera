@@ -764,7 +764,13 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
 
         let initialFrame: NSRect = {
             if let saved = Pref.restoreFrame() { return saved }
-            let screen = NSScreen.main ?? NSScreen.screens[0]
+            // NSScreen.main is nil exactly when `screens` is empty (clamshell, or mid
+            // display-reconfiguration), so screens[0] would trap on the fallback path.
+            guard let screen = NSScreen.main ?? NSScreen.screens.first else {
+                let ratio = max(0.001, cameraAspectRatio.width / cameraAspectRatio.height)
+                let w: CGFloat = 480
+                return NSRect(x: 0, y: 0, width: w, height: (w / ratio).rounded())
+            }
             let ratio  = max(0.001, cameraAspectRatio.width / cameraAspectRatio.height)
             let w: CGFloat = min(480, screen.visibleFrame.width * 0.35)
             let h: CGFloat = (w / ratio).rounded()
