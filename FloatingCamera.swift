@@ -737,12 +737,17 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
     private let previewLayer:      AVCaptureVideoPreviewLayer
     private let contentView =      PreviewContentView(frame: .zero)
 
+    /// Shared by the initial values below, `resetDefaults()` and `isAtDefaults`,
+    /// so the three can't drift apart.
+    static let defaultCornerRadius: CGFloat = 16
+    static let defaultWidth:        CGFloat = 360
+
     private var cameraName:        String
     private var cameraAspectRatio: CGSize
     private(set) var isLocked:     Bool    = false
     private var isAspectLocked:    Bool    = true
     private var isMirrored:        Bool    = false
-    private var cornerRadiusValue:   CGFloat = 16
+    private var cornerRadiusValue:   CGFloat = PreviewWindowController.defaultCornerRadius
     private var hoverOpacityEnabled: Bool    = false
     private var hoverOpacityValue:   Float   = 0.15
     private var isDragging:          Bool    = false
@@ -908,13 +913,13 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
 
     /// Reset all appearance settings to defaults, including size to camera native aspect ratio.
     func resetDefaults() {
-        setCornerRadius(16)
+        setCornerRadius(Self.defaultCornerRadius)
         setOpacity(1.0)
         if isMirrored { toggleMirror() }
         if hoverOpacityEnabled { toggleHoverOpacity() }
         // Reset size to a sensible default at the native camera aspect ratio
         let ratio = cameraAspectRatio.width / max(1, cameraAspectRatio.height)
-        let defaultW: CGFloat = 360
+        let defaultW = Self.defaultWidth
         let defaultH = (defaultW / ratio).rounded()
         guard let win = window else { onStateChanged?(); return }
         let f = win.frame
@@ -933,12 +938,14 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
         let sizeOk: Bool
         if let f = window?.frame {
             let ratio = cameraAspectRatio.width / max(1, cameraAspectRatio.height)
-            let expectedH = (360.0 / ratio).rounded()
-            sizeOk = abs(f.width - 360) < 1 && abs(f.height - expectedH) < 1
+            let expectedH = (Self.defaultWidth / ratio).rounded()
+            sizeOk = abs(f.width - Self.defaultWidth) < 1 && abs(f.height - expectedH) < 1
         } else {
             sizeOk = true
         }
-        return cornerRadiusValue == 0
+        // Tolerance, not ==: the radius slider is continuous, so dragging back to the
+        // default can land on 15.9999 and leave Reset stuck enabled.
+        return abs(cornerRadiusValue - Self.defaultCornerRadius) < 0.5
             && isAspectLocked
             && isAtNativeAspect
             && !isMirrored
