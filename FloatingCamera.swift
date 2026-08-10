@@ -1881,8 +1881,15 @@ final class ControlPanelWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// Origin of the last auto-placement; a mismatch means the user has moved the panel.
+    private var lastAutoOrigin: NSPoint?
+
     func positionRelative(to previewFrame: NSRect, on screen: NSScreen?) {
         guard let win = window else { return }
+        // Runs from onStateChanged, which fires on every slider tick — without this the
+        // panel teleports back mid-drag and interrupts the slider's mouse tracking.
+        if let last = lastAutoOrigin,
+           abs(win.frame.origin.x - last.x) > 1 || abs(win.frame.origin.y - last.y) > 1 { return }
         let vis = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
         let sz  = win.frame.size; let gap: CGFloat = 12
         var x = previewFrame.minX
@@ -1892,6 +1899,7 @@ final class ControlPanelWindowController: NSWindowController, NSWindowDelegate {
         if x + sz.width  > vis.maxX  { x = vis.maxX - sz.width }
         if x < vis.minX              { x = vis.minX }
         win.setFrame(NSRect(x: x, y: y, width: sz.width, height: sz.height), display: true, animate: false)
+        lastAutoOrigin = NSPoint(x: x, y: y)
     }
 
     func update(with state: OverlayState) {
