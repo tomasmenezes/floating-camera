@@ -134,6 +134,11 @@ final class FloatingCameraScriptApp: NSObject, NSApplicationDelegate, NSMenuDele
 
     private var cameraHotKeyRef: EventHotKeyRef?
     private var panelHotKeyRef:  EventHotKeyRef?
+    // Whether the last RegisterEventHotKey call succeeded. The preference is kept either
+    // way (a clash may be transient); the menu labels key off these so we never
+    // advertise a shortcut that can't fire.
+    private var cameraHotKeyActive = false
+    private var panelHotKeyActive  = false
     private var eventHandlerRef: EventHandlerRef?
     private var shortcutsController: ShortcutsWindowController?
     // Keep a legacy alias so existing code doesn't break
@@ -208,26 +213,49 @@ final class FloatingCameraScriptApp: NSObject, NSApplicationDelegate, NSMenuDele
         // Camera visibility hotkey (id=1)
         if let ref = cameraHotKeyRef { UnregisterEventHotKey(ref) }
         cameraHotKeyRef = nil
+        cameraHotKeyActive = false
         let camCode = d.object(forKey: Pref.cameraHotkeyCode) != nil
             ? UInt32(d.integer(forKey: Pref.cameraHotkeyCode)) : Pref.defaultCameraCode
         let camMods = d.object(forKey: Pref.cameraHotkeyMods) != nil
             ? UInt32(d.integer(forKey: Pref.cameraHotkeyMods)) : Pref.defaultCameraMods
         if camCode > 0 {
             let hkID = EventHotKeyID(signature: OSType(0x4643414D), id: 1)
-            RegisterEventHotKey(camCode, camMods, hkID,
-                                GetApplicationEventTarget(), 0, &cameraHotKeyRef)
+            let status = RegisterEventHotKey(camCode, camMods, hkID,
+                                             GetApplicationEventTarget(), 0, &cameraHotKeyRef)
+            if status != noErr {
+                cameraHotKeyRef = nil
+                cameraHotKeyActive = false
+                NSLog("FloatingCamera: camera hotkey registration failed (OSStatus \(status))")
+            } else {
+                cameraHotKeyActive = true
+            }
         }
         // Panel toggle hotkey (id=2) — not set by default
         if let ref = panelHotKeyRef { UnregisterEventHotKey(ref) }
         panelHotKeyRef = nil
+        panelHotKeyActive = false
         let panCode = d.object(forKey: Pref.panelHotkeyCode) != nil
             ? UInt32(d.integer(forKey: Pref.panelHotkeyCode)) : Pref.defaultPanelCode
         let panMods = d.object(forKey: Pref.panelHotkeyMods) != nil
             ? UInt32(d.integer(forKey: Pref.panelHotkeyMods)) : Pref.defaultPanelMods
         if panCode > 0 {
-            let hkID = EventHotKeyID(signature: OSType(0x4643414D), id: 2)
-            RegisterEventHotKey(panCode, panMods, hkID,
-                                GetApplicationEventTarget(), 0, &panelHotKeyRef)
+            // A combo already claimed by the camera hotkey would fail or shadow that
+            // registration, leaving one of the two menu items showing a dead shortcut.
+            if cameraHotKeyRef != nil && panCode == camCode && panMods == camMods {
+                panelHotKeyActive = false
+                NSLog("FloatingCamera: panel hotkey duplicates the camera hotkey; not registered")
+            } else {
+                let hkID = EventHotKeyID(signature: OSType(0x4643414D), id: 2)
+                let status = RegisterEventHotKey(panCode, panMods, hkID,
+                                                 GetApplicationEventTarget(), 0, &panelHotKeyRef)
+                if status != noErr {
+                    panelHotKeyRef = nil
+                    panelHotKeyActive = false
+                    NSLog("FloatingCamera: panel hotkey registration failed (OSStatus \(status))")
+                } else {
+                    panelHotKeyActive = true
+                }
+            }
         }
         // Update menu labels to reflect current shortcuts
         updateShortcutLabels()
@@ -244,8 +272,10 @@ final class FloatingCameraScriptApp: NSObject, NSApplicationDelegate, NSMenuDele
         let panMods = d.object(forKey: Pref.panelHotkeyMods) != nil
             ? UInt32(d.integer(forKey: Pref.panelHotkeyMods)) : Pref.defaultPanelMods
 
-        let camLabel = camCode > 0 ? "  " + ShortcutsWindowController.formatShortcut(code: camCode, mods: camMods) : ""
-        let panLabel = panCode > 0 ? "  " + ShortcutsWindowController.formatShortcut(code: panCode, mods: panMods) : ""
+        let camLabel = camCode > 0 && cameraHotKeyActive
+            ? "  " + ShortcutsWindowController.formatShortcut(code: camCode, mods: camMods) : ""
+        let panLabel = panCode > 0 && panelHotKeyActive
+            ? "  " + ShortcutsWindowController.formatShortcut(code: panCode, mods: panMods) : ""
 
         let camVis = previewController?.window?.isVisible ?? false
         hideCameraMenuItem?.title = (camVis ? "Hide Camera" : "Show Camera") + camLabel
