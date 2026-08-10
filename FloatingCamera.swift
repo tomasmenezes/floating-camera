@@ -867,7 +867,10 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
 
     func toggleLock() {
         isLocked.toggle(); applyLockState()
-        syncHoverOverlay(); onStateChanged?()
+        syncHoverOverlay()
+        // Must follow syncHoverOverlay, which refreshes the cached lock state it reads.
+        contentView.resyncHoverTracking()
+        onStateChanged?()
     }
 
     func toggleAspectLock() {
@@ -1416,6 +1419,20 @@ final class PreviewContentView: NSView {
 
     func setEdgeBadgesVisible(_ visible: Bool) {
         hoverControls.setEdgeBadgesVisible(visible)
+    }
+
+    /// Rebuild the tracking area and re-sync the overlay to the cursor's real position.
+    ///
+    /// Locking sets ignoresMouseEvents, so AppKit never delivers the mouseExited that
+    /// pairs with the last mouseEntered and its tracking state stays stuck on "inside".
+    /// After unlocking no further mouseEntered arrives — the only thing that shows the
+    /// hover controls. Rebuilding the tracking area clears that state.
+    func resyncHoverTracking() {
+        updateTrackingAreas()
+        guard !_isLocked, let win = window else { hoverControls.hideImmediately(); return }
+        // A rebuilt area emits no mouseEntered for a cursor already inside it.
+        let pt = convert(win.mouseLocationOutsideOfEventStream, from: nil)
+        if bounds.contains(pt) { hoverControls.show() } else { hoverControls.hideImmediately() }
     }
 
     var onMouseUp: (() -> Void)?
