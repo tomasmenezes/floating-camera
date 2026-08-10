@@ -858,8 +858,10 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
 
     func updateCamera(_ name: String, aspectRatio: CGSize) {
         cameraName = name; cameraAspectRatio = aspectRatio
-        applyAspectConstraint()
+        // Resize to the new camera's ratio FIRST, then re-lock. Locking before the
+        // resize would pin contentAspectRatio to the outgoing camera's shape.
         if isAspectLocked { fitHeightToAspect() }
+        else              { applyAspectConstraint() }
         syncHoverOverlay(); onStateChanged?()
     }
 
@@ -896,8 +898,9 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
             newW = max(120, f.width)
             newH = max(90,  hFromW)
         }
-        isAspectLocked = true; applyAspectConstraint()
-        win.setFrame(NSRect(x: f.minX, y: f.minY, width: newW, height: newH), display: true)
+        isAspectLocked = true
+        setFrameRelockingAspect(NSRect(x: f.minX, y: f.minY, width: newW, height: newH),
+                                lockTo: cameraAspectRatio)
         UserDefaults.standard.set(true, forKey: Pref.isAspectLocked)
         persistFrame(); onStateChanged?()
     }
@@ -923,12 +926,9 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
         let defaultH = (defaultW / ratio).rounded()
         guard let win = window else { onStateChanged?(); return }
         let f = win.frame
-        // Unlock first so setFrame works without aspect constraints
-        isAspectLocked = false; applyAspectConstraint()
-        win.setFrame(NSRect(x: f.minX, y: f.minY, width: defaultW, height: defaultH), display: true)
-        // Now lock at native ratio
         isAspectLocked = true
-        win.contentAspectRatio = NSSize(width: cameraAspectRatio.width, height: cameraAspectRatio.height)
+        setFrameRelockingAspect(NSRect(x: f.minX, y: f.minY, width: defaultW, height: defaultH),
+                                lockTo: cameraAspectRatio)
         UserDefaults.standard.set(true, forKey: Pref.isAspectLocked)
         persistFrame(); onStateChanged?()
     }
@@ -1198,6 +1198,26 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// Apply an exact frame while the aspect lock is engaged.
+    ///
+    /// `applyAspectConstraint()` pins `contentAspectRatio` to the window's *current*
+    /// ratio, so a programmatic resize must clear the constraint first and re-establish
+    /// it after — otherwise the lock keeps the pre-resize shape and the next user drag
+    /// snaps back to it.
+    /// - Parameter explicitRatio: re-lock to this instead of the resulting frame, whose
+    ///   integer rounding would otherwise accumulate drift across repeated resizes.
+    private func setFrameRelockingAspect(_ rect: NSRect, lockTo explicitRatio: NSSize? = nil) {
+        guard let win = window else { return }
+        win.contentAspectRatio = .zero
+        win.resizeIncrements   = NSSize(width: 1, height: 1)
+        win.setFrame(rect, display: true)
+        if isAspectLocked, let r = explicitRatio, r.width > 0, r.height > 0 {
+            win.contentAspectRatio = r
+        } else {
+            applyAspectConstraint()
+        }
+    }
+
     private func applyCornerRadius() { contentView.cornerRadius = cornerRadiusValue }
 
     private func applyMirrorTransform() {
@@ -1210,7 +1230,8 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
         let w = win.frame.width
         let h = (w / max(0.001, cameraAspectRatio.width / cameraAspectRatio.height)).rounded()
         let f = win.frame
-        win.setFrame(NSRect(x: f.minX, y: f.minY, width: w, height: h), display: true)
+        setFrameRelockingAspect(NSRect(x: f.minX, y: f.minY, width: w, height: h),
+                                lockTo: cameraAspectRatio)
     }
 
     private func persistFrame() {
