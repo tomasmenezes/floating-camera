@@ -982,7 +982,19 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
 
     func applySize(width: CGFloat, height: CGFloat) {
         guard let win = window else { return }
-        let ratio = max(0.001, cameraAspectRatio.width / cameraAspectRatio.height)
+        // The locked shape lives in contentAspectRatio, which applyAspectConstraint()
+        // pins to the window ratio rather than the camera native — deriving from the
+        // native ratio here would silently discard a shape the user locked in.
+        let f0 = win.frame
+        let lockRatio = win.contentAspectRatio
+        let ratio: CGFloat
+        if lockRatio.width > 0 && lockRatio.height > 0 {
+            ratio = max(0.001, lockRatio.width / lockRatio.height)
+        } else if f0.width > 0 && f0.height > 0 {
+            ratio = max(0.001, f0.width / f0.height)
+        } else {
+            ratio = max(0.001, cameraAspectRatio.width / cameraAspectRatio.height)
+        }
         var w = max(120, width)
         var h: CGFloat
         if isAspectLocked {
@@ -1004,7 +1016,8 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
             h = max(90, height)
         }
         let f = win.frame
-        win.setFrame(NSRect(x: f.minX, y: f.minY, width: w, height: h), display: true)
+        setFrameRelockingAspect(NSRect(x: f.minX, y: f.minY, width: w, height: h),
+                                lockTo: lockRatio.width > 0 && lockRatio.height > 0 ? lockRatio : nil)
         persistFrame(); onStateChanged?()
     }
 
