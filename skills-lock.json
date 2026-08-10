@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "graphite-commit": {
+      "source": "tomasmenezes/skills",
+      "sourceType": "github",
+      "skillPath": "skills/graphite-commit/SKILL.md",
+      "computedHash": "df93f2659bb0c7901573ed74c4950ca2581ceeca40c0382ce9b329971d78a47a"
+    }
+  }
+}
