@@ -963,12 +963,10 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func setCornerRadius(_ v: CGFloat) {
-        // Cap at half the smallest side so we never exceed a perfect circle.
-        // 9999 is treated as "use the cap" (Full mode).
-        let halfMin: CGFloat
-        if let f = window?.frame { halfMin = min(f.width, f.height) / 2 }
-        else                     { halfMin = 9999 }
-        cornerRadiusValue = min(max(0, v), halfMin); applyCornerRadius()
+        // Store the REQUESTED radius, 9999 "Full" sentinel included, and let
+        // applyCornerRadius() clamp — persisting the clamped value would freeze "Full"
+        // at whatever the window measured when it was chosen.
+        cornerRadiusValue = max(0, v); applyCornerRadius()
         UserDefaults.standard.set(Double(cornerRadiusValue), forKey: Pref.cornerRadius)
         onStateChanged?()
     }
@@ -1231,7 +1229,18 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    private func applyCornerRadius() { contentView.cornerRadius = cornerRadiusValue }
+    /// Clamp the requested radius to half the smallest side, so it never exceeds a
+    /// perfect circle. Runs on every resize so a "Full" radius tracks the window.
+    private func applyCornerRadius() {
+        // contentView.bounds covers the window not being up yet, so a persisted 9999
+        // sentinel never reaches the layer unclamped.
+        let size = window?.frame.size ?? contentView.bounds.size
+        let halfMin = min(size.width, size.height) / 2
+        let target = halfMin > 0 ? min(cornerRadiusValue, halfMin) : cornerRadiusValue
+        // Skip no-op writes: the setter touches three layer properties and this runs
+        // on every step of a live resize.
+        if abs(contentView.cornerRadius - target) > 0.5 { contentView.cornerRadius = target }
+    }
 
     private func applyMirrorTransform() {
         previewLayer.transform = isMirrored
@@ -1290,6 +1299,8 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
         return NSSize(width: w, height: h)
     }
     func windowDidResize(_ n: Notification) {
+        // Re-clamp the corner radius: "Full" tracks the new size.
+        applyCornerRadius()
         window?.level = .floating   // restore normal level after resize
         persistFrame(); syncHoverOverlay(); onStateChanged?()
     }
