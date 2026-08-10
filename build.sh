@@ -38,7 +38,13 @@ while [[ $# -gt 0 ]]; do
         --intel)     ARCH="x86_64"; shift ;;
         --universal) ARCH="universal"; shift ;;
         --install)   INSTALL=true; shift ;;
-        --sign)      SIGN_IDENTITY="$2"; shift 2 ;;
+        --sign)
+            # Guard before dereferencing $2: `set -u` would abort on it.
+            if [[ $# -lt 2 || "$2" == --* ]]; then
+                echo "✗  --sign requires a signing identity, e.g. --sign \"Developer ID Application: Name (TEAMID)\""
+                exit 1
+            fi
+            SIGN_IDENTITY="$2"; shift 2 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
