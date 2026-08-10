@@ -424,19 +424,20 @@ final class FloatingCameraScriptApp: NSObject, NSApplicationDelegate, NSMenuDele
 
     private func buildPreviewContextMenu() -> NSMenu {
         let menu   = NSMenu()
-        // Use cached submenu devices to avoid blocking discoverDevices() on right-click
-        let devs   = (cameraSubmenuItem.submenu?.items ?? []).compactMap { item -> AVCaptureDevice? in
+        // Cached submenu entries already carry name and uniqueID — avoids resolving an
+        // AVCaptureDevice per item on the main thread during a right-click.
+        let devs   = (cameraSubmenuItem.submenu?.items ?? []).compactMap { item -> (name: String, uid: String)? in
             guard let uid = item.representedObject as? String else { return nil }
-            return AVCaptureDevice(uniqueID: uid)
+            return (item.title, uid)
         }
         let active = captureManager.activeDeviceUniqueID()
         if !devs.isEmpty {
             let hdr = NSMenuItem(title: "Camera", action: nil, keyEquivalent: "")
             hdr.isEnabled = false; menu.addItem(hdr)
             for dev in devs {
-                let item = NSMenuItem(title: dev.localizedName, action: #selector(pickCamera(_:)), keyEquivalent: "")
-                item.target = self; item.representedObject = dev.uniqueID
-                item.state = (dev.uniqueID == active) ? .on : .off
+                let item = NSMenuItem(title: dev.name, action: #selector(pickCamera(_:)), keyEquivalent: "")
+                item.target = self; item.representedObject = dev.uid
+                item.state = (dev.uid == active) ? .on : .off
                 item.indentationLevel = 1; menu.addItem(item)
             }
             menu.addItem(.separator())
