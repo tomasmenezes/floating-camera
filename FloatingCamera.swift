@@ -561,6 +561,7 @@ final class CameraCaptureManager {
     private var _session:   AVCaptureSession?
     private let queue     = DispatchQueue(label: "camera.capture.q", qos: .userInteractive)
     private var _activeID: String?
+    private let activeIDLock = NSLock()
 
     // NO background discovery warm-up in init().
     // The previous code touched VDCAssistant from a background thread during init,
@@ -587,7 +588,16 @@ final class CameraCaptureManager {
             deviceTypes: types, mediaType: .video, position: .unspecified).devices
     }
 
-    func activeDeviceUniqueID() -> String? { queue.sync { _activeID } }
+    /// Non-blocking read: `queue` also runs startRunning() (1–3 s), so reading this
+    /// under queue.sync would beachball any main-thread caller for that long.
+    func activeDeviceUniqueID() -> String? {
+        activeIDLock.lock(); defer { activeIDLock.unlock() }
+        return _activeID
+    }
+
+    private func setActiveID(_ id: String?) {
+        activeIDLock.lock(); _activeID = id; activeIDLock.unlock()
+    }
 
 
     func start(completion: @escaping (Result<CameraLaunchConfiguration, Error>) -> Void) {
@@ -626,7 +636,7 @@ final class CameraCaptureManager {
                 }
                 session.addInput(input); session.commitConfiguration()
                 if !session.isRunning { session.startRunning() }
-                self._activeID = dev.uniqueID
+                self.setActiveID(dev.uniqueID)
                 completion(.success(Self.makeInfo(dev)))
             } catch { completion(.failure(CameraCaptureError.inputCreationFailed)) }
         }
@@ -658,7 +668,7 @@ final class CameraCaptureManager {
 
                 let layer = AVCaptureVideoPreviewLayer(session: session)
                 layer.videoGravity = .resizeAspectFill
-                self._activeID = dev.uniqueID
+                self.setActiveID(dev.uniqueID)
 
                 // Deliver result to main thread BEFORE startRunning() so the
                 // overlay window appears immediately (~commit latency, ~150ms).
