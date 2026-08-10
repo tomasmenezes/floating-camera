@@ -1567,7 +1567,9 @@ final class HoverControlsView: NSView {
         let interactive: [NSView] = [lockBtn, mirrorBtn, centerBtn, hideBtn,
                                       topBadge, bottomBadge, leftBadge, rightBadge]
         for v in interactive {
-            if v.frame.contains(point) { return super.hitTest(point) }
+            // Skip faded-out views: the badges sit at alpha 0 except during a drag, and
+            // their invisible frames would otherwise swallow window-drag mouse-downs.
+            if v.alphaValue > 0.01 && v.frame.contains(point) { return super.hitTest(point) }
         }
         return nil
     }
