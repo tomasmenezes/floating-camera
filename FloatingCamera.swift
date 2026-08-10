@@ -1806,16 +1806,17 @@ final class ControlPanelWindowController: NSWindowController, NSWindowDelegate {
     required init?(coder: NSCoder) { fatalError("unused") }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
-        sender.orderOut(nil); onDidClose?(); return false
+        sender.orderOut(nil)
+        // The title-bar button is the one close path that bypasses toggleVisibility,
+        // so persist here or the panel reappears on the next launch.
+        UserDefaults.standard.set(false, forKey: Pref.panelVisible)
+        onDidClose?(); return false
     }
 
-    func windowDidBecomeVisible() {
-        UserDefaults.standard.set(true,  forKey: "cam.panelVisible")
-    }
     func windowDidResignKey(_ n: Notification) {}
     func windowDidChangeOcclusionState(_ n: Notification) {
         // Save visibility whenever it changes
-        UserDefaults.standard.set(window?.isVisible ?? false, forKey: "cam.panelVisible")
+        UserDefaults.standard.set(window?.isVisible ?? false, forKey: Pref.panelVisible)
     }
 
     private func wireActions() {
