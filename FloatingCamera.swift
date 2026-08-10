@@ -668,7 +668,8 @@ final class CameraCaptureManager {
 
                 session.startRunning()
             } catch {
-                session.commitConfiguration()
+                // The only throwing call — AVCaptureDeviceInput(device:) — runs before
+                // beginConfiguration(), so there is no open configuration to commit here.
                 completion(.failure(CameraCaptureError.inputCreationFailed))
             }
         }
